@@ -1348,49 +1348,50 @@ const resetPassword = async (req, res) => {
     }
 };
 
-const changePassword = async (req, res) =>{
-  try{
-      const { password, confirm } = req.body;
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
 
-      if (!password || !confirm) {
-          return res.status(400).json({ error: 'Password and confirm password are required' });
-      }
-      if (password !== confirm) {
-          return res.status(400).json({ error: 'Passwords do not match' });
-      }
+    // 1. Validate input
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
 
-      // Accept reset token from params, body, or query
-      const rawToken = req.params.token || req.body.token || req.body.resetToken || req.query.token;
-      if (!rawToken) {
-          return res.status(400).json({ error: 'Reset token is required' });
-      }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'New passwords do not match' });
+    }
 
-      // Many apps store the reset token hashed in DB. Try both raw and hashed lookup.
-      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    // 2. Get authenticated user
+    const user = await User.findById(req.user.id).select('+password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-      const user = await User.findOne({
-          $or: [{ resetToken: rawToken }, { resetToken: hashedToken }],
-          resetExpires: { $gte: Date.now() }
-      });
+    // 3. Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
 
-      if (!user) {
-          return res.status(400).json({ error: 'User not found or token expired' });
-      }
+    // 4. Prevent reusing old password
+    const samePassword = await bcrypt.compare(newPassword, user.password);
+    if (samePassword) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
+    }
 
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
+    // 5. Hash & save new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
 
-      user.resetToken = undefined;
-      user.resetExpires = undefined;
+    await user.save();
 
-      await user.save();
-      return res.status(200).json({ msg: 'Password successfully reset' });
+    return res.status(200).json({ msg: 'Password updated successfully' });
 
-  } catch (error){
-      console.error(error)
-      res.status(500).json({ error: 'Internal Server Error' })
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 
 module.exports = {

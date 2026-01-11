@@ -17,25 +17,19 @@ const getUserInfo = async (req, res) => {
             return res.status(404).json({ success: false, error: "User not found" });
         }
 
-        const referralRecord = await referralsModel.findOne({ userId });
-        const referralCode = user.referral_code;
         res.status(200).json({
             success: true,
             message: "User profile retrieved successfully",
             user: {
                 id: user._id,
-                user_name: user.user_name,
+                username: user.username,
                 email: user.email,
+                firstname: user.firstname,
+                lastname: user.lastname,
+                phone_number: user.phone_number,
                 profile_picture: user.profile_picture,
-                profile_banner: user.profile_banner,
                 bio: user.bio,
-                referralCode,
-                referred_by: user.referred_by,
-                referralCount: user.referralCount,
-                leaderboardRank: user.leaderboardRank,
-                user_type: user.user_type,
-                country: user.country,
-                walletAddress: user.walletAddress,
+                role: user.role,
                 isVerified: user.isVerified,
                 createdAt: user.createdAt,
             }

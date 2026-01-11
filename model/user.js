@@ -6,6 +6,8 @@ const { isEmail } = require('validator');
 const userSchema = new Schema(
   {
     username: { type: String, required: true, trim: true },
+    firstname: { type: String, required: true, trim: true },
+    lastname: { type: String, required: true, trim: true },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -23,6 +25,7 @@ const userSchema = new Schema(
     googleId: { type: String, unique: true, sparse: true },
     profile_picture: String,
     phone_number: String,
+    bio: String,
     role: {
       type: String,
       enum: ["Admin", "Investor", "Tenant"],
