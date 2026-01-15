@@ -15,9 +15,10 @@ const connectDB = require("./connectDB/connect.js");
 const transactionRouter = require("./route/transactionRoute.js");
 const User = require("./model/user.js");
 const crypto = require('crypto');
-const checkRole = require("./middleware/checkRole.js");
+// const checkRole = require("./middleware/checkRole.js");
 // const tokRouter = require('./route/token.js')
 const path = require('path');
+const allowRoles = require("./middleware/checkRole.js");
 
 const port = process.env.PORT || 7500;
 const app = express();
@@ -41,7 +42,7 @@ app.use(passport.session());
 
 app.use('/auth', authRouter);
 app.use('/user', isLoggedIn, router);
-app.use('/admin', checkRole('Admin', 'Investor', 'Tenant'), routers);
+app.use('/admin', allowRoles('Admin', 'Investor', 'Tenant'), routers);
 app.use('/transactions',transactionRouter);
 
 // Connect DB

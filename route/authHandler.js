@@ -1,7 +1,6 @@
 const express = require('express');
 const { registerAccount, logout, resendOTP, resetPassword, verifyRegOTP, verifyPassOtp, sendResetOtp, resendResetOtp, login, changePassword } = require('../controller/auth');
 const { isLoggedIn } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/checkPermission');
 const checkRole = require('../middleware/checkRole');
 const passport = require('passport');
 

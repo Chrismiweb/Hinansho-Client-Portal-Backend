@@ -1,9 +1,8 @@
 const User = require('../model/user');
 const Transaction = require('../model/transaction');
 const Notification = require('../model/notification');
-const csv = require('csv-parser');
 const fs = require('fs');
-const { Parser } = require('json2csv');
+const Property = require('../model/property');
 
 // Suspend a user account
 const suspendUser = async (req, res) => {
@@ -85,43 +84,7 @@ const deleteUser = async (req, res) => {
     }
 };
 
-// Fetch all users with their details
-const fetchUsers = async (req, res) => {
-    try {
-        const users = await User.find({user_type: 'User'})
-            .select('user_name email wallet_address kookiePoints referralCount referral_code referred_by');
 
-        const usersWithDetails = await Promise.all(users.map(async (user) => {
-            // Fetch transactions for user
-            const transactions = await Transaction.find({ userId: user._id }).sort({ timestamp: -1 });
-
-            // Fetch user who referred this user
-            const referredBy = user.referred_by
-                ? await User.findById(user.referred_by).select('user_name email referral_code')
-                : null;
-
-            // Fetch users this user referred
-            const referredUsers = await User.find({ referred_by: user._id }).select('user_name email');
-
-            return {
-                ...user.toObject(),
-                referredBy,      // who referred this user
-                referredUsers,   // who this user referred
-                transactions     // user's transaction history
-            };
-        }));
-
-        res.status(200).json({
-            message: "Users with referrals and transactions fetched successfully",
-            users: usersWithDetails,
-            success: true
-        });
-
-    } catch (error) {
-        console.error("Admin fetch users error:", error);
-        res.status(500).json({ message: 'Server error', error, success: false });
-    }
-};
 
 const sendNotification = async (req, res) => {
     try {
@@ -183,99 +146,160 @@ const getAdminProfile = async (req, res) => {
   }
 };
 
-const fetchReferrals = async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id).select('user_type');
+// create property with image
+const createProperty = async (req, res) => {
+  const userId = req.user._id;
 
-        if (!user || !['Admin', 'Master'].includes(user.user_type)) {
-            return res.status(403).json({ message: 'Access denied. Admins only.', success: false });
-        }
+  const {
+    name,
+    property_type,
+    location,
+    description,
+    status,
+    totalUnits,
+    expected_roi
+  } = req.body;
 
-        const referrals = await User.find({ referred_by: user._id }).select('user_name email referral_code createdAt');
-
-        return res.status(200).json({
-            success: true,
-            message: referrals.length ? 'Referrals fetched successfully' : 'No referrals found',
-            referrals,
-        });
-    } catch (error) {
-        console.error("Error fetching referrals:", error);
-        return res.status(500).json({ message: 'Server error', error: error.message, success: false });
-    }
-};
-
-const uploadCsv = async (req, res) => {
+  try {
+    // Validate image upload
     if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+      return res.status(400).json({
+        success: false,
+        message: 'Property image is required'
+      });
     }
 
-    const filePath = req.file.path;
-    const results = [];
+    // Build URL dynamically (works everywhere)
+    const protocol = req.protocol;
+    const host = req.get('host');
 
-    fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (data) => {
-            // Validate wallet address format
-            const walletRegex = /^0x[a-fA-F0-9]{40}$/;
-            if (!walletRegex.test(data.walletAddress)) {
-                return res.status(400).json({ message: `Invalid wallet address format in row: ${JSON.stringify(data)}` });
-            }
-            results.push(data);
-        })
-        .on('end', async () => {
-            try {
-                // Insert all valid entries into the whitelist
-                const whitelistEntries = results.map(entry => ({
-                    walletAddress: entry.walletAddress,
-                    addedByUser: req.user._id // Assuming req.user._id contains the ID of the admin uploading the CSV
-                }));
+    const imageUrl = `${protocol}://${host}/uploads/property_image/${req.file.filename}`;
 
-                await Whitelist.insertMany(whitelistEntries);
-                res.status(201).json({ message: "Whitelist entries added successfully", entries: whitelistEntries });
-            } catch (err) {
-                res.status(500).json({ message: "Error saving to database", error: err.message });
-            }
-        })
-        .on('error', (err) => {
-            res.status(500).json({ message: "Error reading CSV file", error: err.message });
-        });
+    const newProperty = await Property.create({
+      name,
+      property_type,
+      location,
+      description,
+      status,
+      totalUnits,
+      expected_roi,
+      images: [imageUrl],
+      createdBy: userId
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Property created successfully',
+      property: newProperty
+    });
+
+  } catch (error) {
+    console.error('Error creating property:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
 };
 
-const downloadTransactions = async (req, res) => {
+const fetchProperties = async (req, res) => {
     try {
-        const transactions = await Transaction.find({}).sort({ timestamp: -1 });
-
-        if (transactions.length === 0) {
-            return res.status(404).json({ message: 'No transactions found' });
-        }
-
-        // Convert transactions to CSV format
-        const fields = ['userId', 'itemId', 'amount', 'timestamp', 'status' , 'transactionId', 'date'];
-        const opts = { fields };
-        const parser = new Parser(opts);
-        const csvData = parser.parse(transactions);
-
-        // Set headers for file download
-        res.setHeader('Content-disposition', 'attachment; filename=transactions.csv');
-        res.setHeader('Content-Type', 'text/csv');
-
-        // Send CSV data
-        res.status(200).send(csvData);
-    } catch (error) {
-        console.error("Error downloading transactions:", error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        const properties = await Property.find().populate('createdBy', 'name email');
+        res.status(200).json({ success: true, properties });
+    }
+    catch (error) {
+        console.error('Error fetching properties:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
-  
+
+//get all investors
+const getAllInvestors = async (req, res) => {
+    try {
+        const investors = await User.find({ role: 'Investor' });
+        res.status(200).json({ success: true, investors });
+    }
+    catch (error) {
+        console.error('Error fetching investors:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+const getAllTenants = async (req, res) => {
+    try {
+        const tenants = await User.find({ role: 'Tenant' });
+        res.status(200).json({ success: true, tenants });
+    }
+    catch (error) {
+        console.error('Error fetching tenants:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+//update property
+const updateProperty = async (req, res) => {
+    const { propertyId } = req.params;
+    
+    try {
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found'
+      });
+    }
+
+    const {
+      name,
+      property_type,
+      location,
+      description,
+      status,
+      expected_roi
+    } = req.body;
+
+    if (name) property.name = name;
+    if (property_type) property.property_type = property_type;
+    if (location) property.location = location;
+    if (description) property.description = description;
+    if (status) property.status = status;
+    if (expected_roi) property.expected_roi = expected_roi;
+
+    // Optional image replacement
+    if (req.file) {
+      const protocol = req.protocol;
+      const host = req.get('host');
+      property.image = `${protocol}://${host}/uploads/property_image/${req.file.filename}`;
+    }
+
+    await property.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Property updated successfully',
+      property
+    });
+
+  } catch (error) {
+    console.error('Update property error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
 module.exports = {
     suspendUser,
     unsuspendUser,
     deleteUser,
-    fetchUsers,
     sendNotification,
     getAdminProfile,
-    fetchReferrals,
-    uploadCsv,
-    downloadTransactions
-
+    createProperty,
+    fetchProperties,
+    getAllInvestors,
+    getAllTenants,
+    updateProperty
 };
