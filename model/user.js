@@ -22,6 +22,10 @@ const userSchema = new Schema(
       minlength: [8, 'Password must be at least 8 characters'],
       select: false
     },
+    forcePasswordChange: {
+      type: Boolean,
+      default: false
+    },
     googleId: { type: String, unique: true, sparse: true },
     profile_picture: String,
     phone_number: String,

@@ -22,8 +22,8 @@ const OwnershipSchema = new Schema({
   amountPaid: { type: Number, required: true },
 
   documents: [{
-    name: String,
-    fileUrl: String
+    type: Schema.Types.ObjectId,
+    ref: 'PropertyDocument'
   }],
 
   assignedBy: {

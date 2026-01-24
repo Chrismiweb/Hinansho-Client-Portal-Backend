@@ -42,7 +42,7 @@ app.use(passport.session());
 
 app.use('/auth', authRouter);
 app.use('/user', isLoggedIn, router);
-app.use('/admin', allowRoles('Admin', 'Investor', 'Tenant'), routers);
+app.use('/admin', isLoggedIn, allowRoles('Admin', 'Investor', 'Tenant'), routers);
 app.use('/transactions',transactionRouter);
 
 // Connect DB

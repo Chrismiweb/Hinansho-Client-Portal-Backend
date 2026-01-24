@@ -24,7 +24,7 @@ const fileFilter = (req, file, cb) => {
     if (extname && mimetype) {
         cb(null, true)
     } else {
-        cb(new Error("Only .jpeg, .jpg, .png, .gif files are allowed"))
+        cb(new Error("Only .jpeg, .jpg, .png, .gif, .pdf files are allowed"))
     }
 }
 
@@ -72,7 +72,7 @@ const uploadProfilePicture = async (req, res) => {
 
 const updateProfile = async (req, res) => {
     try {
-        const userId = req.user?.userId;
+        const userId = req.user;
         const { firstname, lastname, phone_number, bio } = req.body;
 
         // Find user profile
@@ -111,7 +111,7 @@ const updateProfile = async (req, res) => {
 
 const getProfileMedia = async (req, res) => {
     try {
-        const userId = req.user?.userId;
+        const userId = req.user;
 
         // Find user profile
         const existingProfile = await User.findById(userId);

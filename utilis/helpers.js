@@ -17,10 +17,18 @@ const comparePassword = async (plain, hashed) => {
   return await bcrypt.compare(plain, hashed);
 };
 
-const generateToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
-  });
+// In your auth controller or wherever you generate tokens
+const generateToken = (user) => {
+  // Make sure you're passing the user object with _id
+  return jwt.sign(
+    { 
+      userId: user._id.toString(), // Convert ObjectId to string
+      email: user.email,
+      role: user.role
+    }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '7d' }
+  );
 };
 
 module.exports = {

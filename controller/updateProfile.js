@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 
 const getUserInfo = async (req, res) => {
     try {
-        const userId = req.user?.userId;  // Get user ID from request params
+        const userId = req.user;  // Get user ID from request params
 
         // Find user and exclude sensitive fields
         const user = await User.findById(userId).select("-password -otp -otpExpiration -resetToken -resetExpires");

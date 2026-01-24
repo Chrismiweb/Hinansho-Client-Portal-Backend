@@ -350,6 +350,144 @@ const registerAccount = async (req, res) => {
   }
 };
 
+const createInvestorByAdmin = async (req, res) => {
+  try {
+    const adminId = req.user._id;
+
+    const { username, email, fullName, phone } = req.body;
+
+    // 1️⃣ Required fields
+    const required = ['username', 'email', 'fullName'];
+    const missing = required.filter(k => !req.body[k]);
+    if (missing.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing: ${missing.join(', ')}`
+      });
+    }
+
+    const normalisedEmail = email.toLowerCase().trim();
+
+    // 2️⃣ Duplicate checks
+    if (await User.findOne({ email: normalisedEmail })) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already exists'
+      });
+    }
+
+    if (await User.findOne({ username })) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username already exists'
+      });
+    }
+
+    // 3️⃣ Generate secure temporary password
+    const tempPassword = crypto.randomBytes(6).toString('base64'); // ~10 chars
+
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // 4️⃣ Create investor user
+    const investor = await User.create({
+      username,
+      email: normalisedEmail,
+      password: hashedPassword,
+      role: 'Investor',
+      isVerified: true,
+      forcePasswordChange: true,
+      createdBy: adminId
+    });
+
+    // 5️⃣ Send login credentials email
+    await transporter.sendMail({
+      from: { name: 'Hinansho Client Portal', address: process.env.ADMIN_EMAIL },
+      to: normalisedEmail,
+      subject: 'Your Investor Account Has Been Created',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Investor Account Created</title>
+</head>
+<body style="background:#F5F7FB;font-family:Segoe UI,Arial,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:14px;box-shadow:0 6px 25px rgba(0,0,0,.08);overflow:hidden">
+    
+    <div style="padding:28px;text-align:center;border-bottom:2px solid #C9A24D">
+      <img src="cid:logo" width="90" />
+      <h2>Hinansho Client Portal</h2>
+    </div>
+
+    <div style="padding:32px">
+      <h3>Hello ${fullName},</h3>
+
+      <p>
+        An investor account has been created for you on the
+        <strong>Hinansho Client Portal</strong>.
+      </p>
+
+      <div style="background:#F8FAFC;padding:16px;border-left:4px solid #C9A24D;border-radius:8px">
+        <p><strong>Login Details:</strong></p>
+        <p>Email: ${normalisedEmail}</p>
+        <p>Username: ${username}</p>
+        <p>Temporary Password: <strong>${tempPassword}</strong></p>
+      </div>
+
+      <p>
+        For security reasons, you will be required to change your password
+        immediately after your first login.
+      </p>
+
+      <p>
+        Login here: <br />
+        <a href="${process.env.CLIENT_PORTAL_URL}">
+          ${process.env.CLIENT_PORTAL_URL}
+        </a>
+      </p>
+
+      <p>
+        If you have any questions, please contact our support team.
+      </p>
+    </div>
+
+    <div style="background:#0F172A;color:#CBD5E1;font-size:12px;text-align:center;padding:18px">
+      © ${new Date().getFullYear()} Hinansho Management
+    </div>
+
+  </div>
+</body>
+</html>
+      `,
+      attachments: [
+        {
+          filename: "logo.png",
+          path: "./Hinansho Gold 2 1.png",
+          cid: "logo",
+        },
+      ],
+    });
+
+    // 6️⃣ Success response
+    res.status(201).json({
+      success: true,
+      message: 'Investor account created and credentials sent via email',
+      investor: {
+        id: investor._id,
+        email: investor.email,
+        username: investor.username
+      }
+    });
+
+  } catch (error) {
+    console.error('Create investor error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 // Verify Register OTP
 const verifyRegOTP = async (req, res) => {
     try {
@@ -685,11 +823,27 @@ const login = async (req, res) => {
 
     }
 
-    const token = generateToken({ userId: user._id });
+    const token = generateToken(user); // Make sure this includes userId
+
+    if (user.forcePasswordChange) {
+      return res.status(200).json({
+        success: true,
+        forcePasswordChange: true,
+        message: 'Password change required',
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role
+        }
+      });
+    }
+
 
     res.json({
       message: 'Login successful',
       token,
+      forcePasswordChange: false,
       user: {
         id: user._id,
         email: user.email,
@@ -1352,50 +1506,61 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
-    // 1. Validate input
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ error: 'New password fields are required' });
     }
 
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ error: 'New passwords do not match' });
+      return res.status(400).json({ error: 'Passwords do not match' });
     }
 
-    // 2. Get authenticated user
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
     const user = await User.findById(req.user.id).select('+password');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // 3. Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
+    // 🔐 NORMAL PASSWORD CHANGE
+    if (!user.forcePasswordChange) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      const samePassword = await bcrypt.compare(newPassword, user.password);
+      if (samePassword) {
+        return res.status(400).json({ error: 'New password must be different from current password' });
+      }
     }
 
-    // 4. Prevent reusing old password
-    const samePassword = await bcrypt.compare(newPassword, user.password);
-    if (samePassword) {
-      return res.status(400).json({ error: 'New password must be different from current password' });
-    }
-
-    // 5. Hash & save new password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
+    // 🔐 FORCE CHANGE (ADMIN-CREATED USERS)
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.forcePasswordChange = false;
 
     await user.save();
-
-    return res.status(200).json({ msg: 'Password updated successfully' });
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully'
+    });
 
   } catch (error) {
-    console.error(error);
+    console.error('Change password error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
 
+
 module.exports = {
     registerAccount,
+    createInvestorByAdmin,
     login,
     logout,
     verifyRegOTP,

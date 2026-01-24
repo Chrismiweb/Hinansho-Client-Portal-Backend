@@ -4,6 +4,7 @@ const Unit = require('../model/unit');
 const Property = require('../model/property');
 const Ownership = require('../model/owner');
 const Tenancy = require('../model/tenancy');
+const PropertyDocument = require('../model/propertyDocument');
 
 // Create unit
 const createUnit = async (req, res) => {
@@ -421,12 +422,150 @@ const deleteUnit = async (req, res) => {
   }
 };
 
+// Admin uploads property documents for investor
+const uploadPropertyDocuments = async (req, res) => {
+  const { investorId } = req.params;
+  const { propertyId, documentType } = req.body;
+
+  try {
+    // 1️⃣ Validate investor
+    const investor = await User.findById(investorId);
+    if (!investor || investor.role !== 'Investor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Investor not found'
+      });
+    }
+
+    // 2️⃣ Validate files
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded'
+      });
+    }
+
+    const protocol = req.protocol;
+    const host = req.get('host');
+
+    // 3️⃣ Save documents
+    const savedFiles = await Promise.all(
+      req.files.map(file => {
+        return PropertyDocument.create({
+          investor: investorId,
+          property: propertyId || null,
+          documentType: documentType || 'legal',
+          fileUrl: `${protocol}://${host}/uploads/documents/${file.filename}`,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          uploadedBy: req.user._id
+        });
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Documents uploaded successfully',
+      documents: savedFiles
+    });
+
+  } catch (error) {
+    console.error('Upload property documents error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to upload documents'
+    });
+  }
+};
+
+//fetch docs for investor using propertyId
+const fetchPropertyDocuments = async (req, res) => {
+  const { investorId } = req.params;
+  const { propertyId } = req.query;
+  const { documentId } = req.query;
+
+  try {
+    // 1️⃣ Validate investor
+    const investor = await User.findById(investorId);
+    if (!investor || investor.role !== 'Investor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Investor not found'
+      });
+    }
+
+    // 2️⃣ Fetch documents
+    const document = await PropertyDocument.findById({ investor: investorId, property: propertyId, _id: documentId });
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'No documents found for this property'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      document
+    });
+
+  } catch (error) {
+    console.error('Fetch property documents error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch documents'
+    });
+  }
+};
+
+//delete document
+const deletePropertyDocument = async (req, res) => {
+  const { documentId } = req.params;
+
+  try {
+    // 1️⃣ Validate document
+    const document = await PropertyDocument.findById(documentId);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // 2️⃣ Check if user is authorized to delete
+    if (document.uploadedBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this document'
+      });
+    }
+
+    // 3️⃣ Delete document
+    await PropertyDocument.deleteOne({ _id: documentId });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Document deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete property document error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete document'
+    });
+  }
+};
+
 module.exports = {
   createUnit,
   getUnitsByProperty,
   getAvailableUnits,
+  uploadPropertyDocuments,
   assignUnitToInvestor,
   assignTenantsToUnit,
   updateUnit,
-  deleteUnit
+  deleteUnit,
+  fetchPropertyDocuments,
+  deletePropertyDocument
 };
