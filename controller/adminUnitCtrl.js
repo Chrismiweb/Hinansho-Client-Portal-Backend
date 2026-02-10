@@ -5,6 +5,8 @@ const Property = require('../model/property');
 const Ownership = require('../model/owner');
 const Tenancy = require('../model/tenancy');
 const PropertyDocument = require('../model/propertyDocument');
+const RentPaymentRequest = require('../model/rentPayment');
+const Rent = require('../model/rent');
 
 // Create unit
 const createUnit = async (req, res) => {
@@ -75,7 +77,6 @@ const getUnitsByProperty = async (req, res) => {
   try {
     const units = await Unit.find({ property: propertyId })
       .populate('investor', 'name email')
-      .populate('tenants', 'name email');
 
     res.status(200).json({
       success: true,
@@ -184,110 +185,94 @@ const assignUnitToInvestor = async (req, res) => {
 };
 
 const assignTenantsToUnit = async (req, res) => {
-  const adminId = req.user._id;
-
-  const {
-    unitId,
-    tenantIds,
-    rentAmount,
-    lease_start,
-    lease_end,
-    securityDeposit
-  } = req.body;
-
-  if (!unitId || !tenantIds || !Array.isArray(tenantIds) || tenantIds.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'unitId and tenantIds are required'
-    });
-  }
-
   try {
-    const tenancy = await withTransaction(async (session) => {
+    const adminId = req.user._id;
+    const {
+      unitId,
+      tenantId,
+      rentAmount,
+      securityDeposit,
+      startDate,
+      endDate
+    } = req.body;
 
-      // 1️⃣ Fetch unit
-      const unit = await Unit.findById(unitId).session(session);
-      if (!unit) throw new Error('Unit not found');
+    // 1️⃣ Fetch unit
+    const unit = await Unit.findById(unitId);
+    if (!unit) {
+      return res.status(404).json({ success: false, message: 'Unit not found' });
+    }
 
-      if (!unit.investor) {
-        throw new Error('Unit must be owned before assigning tenants');
-      }
+    if (!unit.investor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Unit must have an investor before tenancy'
+      });
+    }
 
-      const existingTenants = unit.tenants || [];
+    // 2️⃣ Validate tenant
+    const tenant = await User.findById(tenantId);
+    if (!tenant || tenant.role !== 'Tenant') {
+      return res.status(400).json({ success: false, message: 'Invalid tenant' });
+    }
 
-      // 2️⃣ Prevent exceeding max
-      if (existingTenants.length + tenantIds.length > 2) {
-        throw new Error('Maximum of 2 tenants allowed per unit');
-      }
-
-      // 3️⃣ Prevent duplicates
-      const duplicates = tenantIds.filter(id =>
-        existingTenants.includes(id.toString())
-      );
-      if (duplicates.length > 0) {
-        throw new Error('Tenant already assigned to this unit');
-      }
-
-      // 4️⃣ Validate tenants
-      const tenants = await User.find({
-        _id: { $in: tenantIds },
-        role: 'Tenant'
-      }).session(session);
-
-      if (tenants.length !== tenantIds.length) {
-        throw new Error('One or more tenants are invalid');
-      }
-
-      // 5️⃣ FIND existing tenancy
-      let tenancy = await Tenancy.findOne({ unit: unit._id }).session(session);
-
-      if (!tenancy) {
-        // Create tenancy ONCE
-        tenancy = await Tenancy.create(
-          [{
-            unit: unit._id,
-            tenants: [...existingTenants, ...tenantIds],
-            rentAmount,
-            securityDeposit,
-            startDate: lease_start,
-            endDate: lease_end,
-            assignedBy: adminId
-          }],
-          { session }
-        );
-
-        tenancy = tenancy[0];
-      } else {
-        // Update existing tenancy
-        tenancy.tenants.push(...tenantIds);
-        await tenancy.save({ session });
-      }
-
-      // 6️⃣ Update unit
-      unit.tenants.push(...tenantIds);
-      if (unit.tenants.length === 2) {
-        unit.status = 'occupied';
-      }
-
-      await unit.save({ session });
-
-      return tenancy;
+    // 3️⃣ Find ACTIVE tenancy for unit
+    let tenancy = await Tenancy.findOne({
+      unit: unit._id,
+      status: 'active'
     });
 
-    res.status(200).json({
+    // 4️⃣ If tenancy exists → ADD TENANT
+    if (tenancy) {
+      if (tenancy.tenants.length >= 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Unit already has maximum tenants'
+        });
+      }
+
+      if (tenancy.tenants.includes(tenant._id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tenant already assigned to this unit'
+        });
+      }
+
+      tenancy.tenants.push(tenant._id);
+      await tenancy.save();
+    } 
+    // 5️⃣ Else → CREATE tenancy
+    else {
+      tenancy = await Tenancy.create({
+        unit: unit._id,
+        tenants: [tenant._id],
+        investor: unit.investor,
+        property: unit.property,
+        rentAmount,
+        securityDeposit,
+        startDate,
+        endDate,
+        assignedBy: adminId
+      });
+
+      unit.status = 'occupied';
+      await unit.save();
+    }
+
+    return res.status(201).json({
       success: true,
-      message: 'Tenant(s) assigned successfully',
+      message: 'Tenant assigned successfully',
       tenancy
     });
 
   } catch (error) {
-    console.error('Assign tenants error:', error.message);
-    res.status(400).json({
+    console.error('Assign tenant error:', error.message);
+    return res.status(400).json({
       success: false,
       message: error.message
     });
   }
 };
+
 
 const updateUnit = async (req, res) => {
   const { unitId } = req.params;
@@ -422,10 +407,10 @@ const deleteUnit = async (req, res) => {
   }
 };
 
-// Admin uploads property documents for investor
+// Admin uploads property documents for investor with units owned
 const uploadPropertyDocuments = async (req, res) => {
   const { investorId } = req.params;
-  const { propertyId, documentType } = req.body;
+  const { propertyId,unitId, documentType } = req.body;
 
   try {
     // 1️⃣ Validate investor
@@ -445,6 +430,28 @@ const uploadPropertyDocuments = async (req, res) => {
       });
     }
 
+    //validate property
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found'
+      });
+    }
+
+    // Validate unit IF provided
+    let unit = null;
+    if (unitId) {
+      unit = await Unit.findOne({ _id: unitId, property: propertyId });
+      if (!unit) {
+        return res.status(404).json({
+          success: false,
+          message: 'Unit not found for this property'
+        });
+      }
+    }
+
+
     const protocol = req.protocol;
     const host = req.get('host');
 
@@ -454,6 +461,7 @@ const uploadPropertyDocuments = async (req, res) => {
         return PropertyDocument.create({
           investor: investorId,
           property: propertyId || null,
+          unit: unit ? unit._id : null,
           documentType: documentType || 'legal',
           fileUrl: `${protocol}://${host}/uploads/documents/${file.filename}`,
           originalName: file.originalname,
@@ -557,6 +565,60 @@ const deletePropertyDocument = async (req, res) => {
   }
 };
 
+const getPendingPayments = async (req, res) => {
+  const payments = await RentPaymentRequest.find({ status: 'pending' })
+    .populate('tenant unit property');
+
+  res.json({ success: true, payments });
+};
+
+const approvePayment = async (req, res) => {
+  const adminId = req.user._id;
+  const { paymentId } = req.params;
+  const { adminNote } = req.body;
+
+  const payment = await RentPaymentRequest.findById(paymentId);
+  if (!payment || payment.status !== 'pending') {
+    return res.status(400).json({ message: 'Invalid payment request' });
+  }
+
+  await Rent.create({
+    tenant: payment.tenant,
+    investor: payment.investor,
+    property: payment.property,
+    unit: payment.unit,
+    tenancy: payment.tenancy,
+    amount: payment.amountClaimed,
+    rentDate: payment.rentDate,
+    approvedBy: adminId
+  });
+
+  payment.status = 'approved';
+  payment.adminNote = adminNote;
+  payment.reviewedBy = adminId;
+  payment.reviewedAt = new Date();
+  await payment.save();
+
+  res.json({ success: true, message: 'Payment approved' });
+};
+
+const rejectPayment = async (req, res) => {
+  const { paymentId } = req.params;
+  const { adminNote } = req.body;
+
+  const payment = await RentPaymentRequest.findById(paymentId);
+  if (!payment || payment.status !== 'pending') {
+    return res.status(400).json({ message: 'Invalid payment request' });
+  }
+
+  payment.status = 'rejected';
+  payment.adminNote = adminNote;
+  payment.reviewedAt = new Date();
+  await payment.save();
+
+  res.json({ success: true, message: 'Payment rejected' });
+};
+
 module.exports = {
   createUnit,
   getUnitsByProperty,
@@ -567,5 +629,8 @@ module.exports = {
   updateUnit,
   deleteUnit,
   fetchPropertyDocuments,
-  deletePropertyDocument
+  deletePropertyDocument,
+  getPendingPayments,
+  approvePayment,
+  rejectPayment
 };

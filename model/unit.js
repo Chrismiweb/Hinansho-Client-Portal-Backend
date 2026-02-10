@@ -11,7 +11,6 @@ const unitSchema = new mongoose.Schema({
   unitNo: {
     type: String,
     required: true
-    // Example: HST-A01, LAND-1A
   },
 
   type: {
@@ -22,43 +21,25 @@ const unitSchema = new mongoose.Schema({
 
   maxTenants: {
     type: Number,
-    default: 2
+    default: 1 // 🔑 now aligns with single tenancy
   },
 
-  rentAmount: {
-    type: Number
-  },
-
-  bedrooms: {
-    type: Number,
-    default: 1
-  },
-
-  bathrooms: {
-    type: Number,
-    default: 1
-  },
-
-  sizeSqFt: {
-    type: Number
-  },
+  bedrooms: Number,
+  bathrooms: Number,
+  sizeSqFt: Number,
 
   status: {
     type: String,
-    enum: ['vacant', 'owned', 'occupied'],
-    default: 'vacant'
+    enum: ['vacant', 'occupied'],
+    default: 'vacant',
+    index: true
   },
 
   investor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    default: null
+    required: true
   },
-
-  tenants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
 
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -67,16 +48,5 @@ const unitSchema = new mongoose.Schema({
   }
 
 }, { timestamps: true });
-
-/**
- * Enforce:
- * - Max 2 tenants per unit
- */
-unitSchema.pre('save', function (next) {
-  if (this.tenants.length > this.maxTenants) {
-    return next(new Error('Maximum tenant limit exceeded'));
-  }
-  next();
-});
 
 module.exports = mongoose.model('Unit', unitSchema);

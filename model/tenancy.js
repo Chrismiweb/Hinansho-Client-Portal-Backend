@@ -5,7 +5,25 @@ const TenancySchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Unit',
     required: true,
-    unique: true
+    index: true
+  },
+
+  tenants: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }],
+
+  investor: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+
+  property: {
+    type: Schema.Types.ObjectId,
+    ref: 'Property',
+    required: true
   },
 
   rentAmount: {
@@ -18,18 +36,36 @@ const TenancySchema = new Schema({
     required: true
   },
 
-  tenants: [{
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  startDate: {
+    type: Date,
+    required: true
+  },
 
-  startDate: Date,
-  endDate: Date,
+  endDate: {
+    type: Date
+  },
+
+  status: {
+    type: String,
+    enum: ['active', 'terminated', 'expired'],
+    default: 'active',
+    index: true
+  },
 
   assignedBy: {
     type: Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User' // admin
   }
+
 }, { timestamps: true });
+
+/**
+ * Enforce:
+ * - One ACTIVE tenancy per unit
+ */
+TenancySchema.index(
+  { unit: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'active' } }
+);
 
 module.exports = model('Tenancy', TenancySchema);

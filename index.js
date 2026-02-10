@@ -19,6 +19,8 @@ const crypto = require('crypto');
 // const tokRouter = require('./route/token.js')
 const path = require('path');
 const allowRoles = require("./middleware/checkRole.js");
+const tenantRouters = require("./route/tenantHandler.js");
+const investorRouters = require("./route/investorHandler.js");
 
 const port = process.env.PORT || 7500;
 const app = express();
@@ -42,7 +44,9 @@ app.use(passport.session());
 
 app.use('/auth', authRouter);
 app.use('/user', isLoggedIn, router);
-app.use('/admin', isLoggedIn, allowRoles('Admin', 'Investor', 'Tenant'), routers);
+app.use('/admin', isLoggedIn, allowRoles('Admin'), routers);
+app.use('/tenant', isLoggedIn, allowRoles('Tenant'), tenantRouters);
+app.use('/investor', isLoggedIn, allowRoles('Investor'), investorRouters);
 app.use('/transactions',transactionRouter);
 
 // Connect DB

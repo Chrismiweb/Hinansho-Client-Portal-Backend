@@ -1,8 +1,7 @@
 const express = require('express');
 const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty} = require('../controller/adminCtrl');
 const { upload } = require('../controller/uploadProfilePic');
-const { getAdminDashboardData } = require('../utilis/dashboardAdmin');
-const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument } = require('../controller/adminUnitCtrl');
+const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument, getPendingPayments, approvePayment, rejectPayment } = require('../controller/adminUnitCtrl');
 const { createInvestorByAdmin } = require('../controller/auth');
 const uploadDocuments = require('../middleware/uploadDocs');
 
@@ -12,6 +11,7 @@ const routers = express.Router()
 
 routers.get('/getInvestors', getAllInvestors);
 routers.get('/getTenants', getAllTenants);
+routers.get('/rent/pending', getPendingPayments);
 routers.post('/createInvestor', createInvestorByAdmin);
 routers.post('/add-properties', upload.single('image'), createProperty);
 routers.get('/fetch-properties', fetchProperties);
@@ -20,6 +20,8 @@ routers.get('/units/property/:propertyId', getUnitsByProperty);
 routers.get('/units/available', getAvailableUnits);
 routers.post('/assign-unit', assignUnitToInvestor);
 routers.post('/investors/:investorId/documents', uploadDocuments.array('documents', 10), uploadPropertyDocuments);
+routers.post('/rent/approve/:paymentId', approvePayment);
+routers.post('/rent/reject/:paymentId', rejectPayment);
 routers.get('/investors/:investorId/documents', fetchPropertyDocuments);
 routers.post('/assign-tenants', assignTenantsToUnit);
 routers.put('/update-unit/:unitId', updateUnit);
