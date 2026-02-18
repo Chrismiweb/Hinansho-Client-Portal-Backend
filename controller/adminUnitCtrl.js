@@ -115,6 +115,7 @@ const getAvailableUnits = async (req, res) => {
 
 const assignUnitToInvestor = async (req, res) => {
   const adminId = req.user._id;
+  
 
   const {
     unitId,

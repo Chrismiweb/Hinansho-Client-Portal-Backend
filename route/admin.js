@@ -1,5 +1,5 @@
 const express = require('express');
-const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty} = require('../controller/adminCtrl');
+const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails} = require('../controller/adminCtrl');
 const { upload } = require('../controller/uploadProfilePic');
 const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument, getPendingPayments, approvePayment, rejectPayment } = require('../controller/adminUnitCtrl');
 const { createInvestorByAdmin } = require('../controller/auth');
@@ -10,6 +10,7 @@ const routers = express.Router()
 
 
 routers.get('/getInvestors', getAllInvestors);
+routers.get('/investor/:investorId', getInvestorDetails);
 routers.get('/getTenants', getAllTenants);
 routers.get('/rent/pending', getPendingPayments);
 routers.post('/createInvestor', createInvestorByAdmin);

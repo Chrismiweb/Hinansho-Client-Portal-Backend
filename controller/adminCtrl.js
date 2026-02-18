@@ -3,6 +3,8 @@ const Transaction = require('../model/transaction');
 const Notification = require('../model/notification');
 const fs = require('fs');
 const Property = require('../model/property');
+const Ownership = require('../model/owner');
+const PropertyDocument = require('../model/propertyDocument');
 
 // Suspend a user account
 const suspendUser = async (req, res) => {
@@ -214,17 +216,223 @@ const fetchProperties = async (req, res) => {
     }
 };
 
-//get all investors
+//get all investors with their total investment and properties owned
 const getAllInvestors = async (req, res) => {
-    try {
-        const investors = await User.find({ role: 'Investor' });
-        res.status(200).json({ success: true, investors });
-    }
-    catch (error) {
-        console.error('Error fetching investors:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
-    }
+  try {
+
+    // ==========================
+    // 1️⃣ Investors Table Data
+    // ==========================
+    const investors = await User.aggregate([
+
+      { $match: { role: 'Investor' } },
+
+      {
+        $lookup: {
+          from: 'ownerships',
+          localField: '_id',
+          foreignField: 'investor',
+          as: 'ownerships'
+        }
+      },
+
+      {
+        $addFields: {
+          totalInvestment: { $sum: '$ownerships.amountPaid' },
+          propertiesCount: {
+            $size: {
+              $setUnion: ['$ownerships.property']
+            }
+          },
+          fullName: {
+            $concat: ['$firstName', ' ', '$lastName']
+          }
+        }
+      },
+
+      {
+        $project: {
+          fullName: 1,
+          email: 1,
+          status: 1,
+          lastLogin: 1,
+          totalInvestment: 1,
+          propertiesCount: 1
+        }
+      }
+
+    ]);
+
+
+    // ==========================
+    // 2️⃣ Dashboard Summary Cards
+    // ==========================
+
+    // Total Investors
+    const totalInvestors = await User.countDocuments({
+      role: 'Investor'
+    });
+
+    // Pending Invites
+    const pendingInvites = await User.countDocuments({
+      role: 'Investor',
+      status: 'Pending'
+    });
+
+    // Assets Under Management (AUM)
+    const aumAgg = await Ownership.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amountPaid' }
+        }
+      }
+    ]);
+
+    const assetsUnderManagement = aumAgg[0]?.total || 0;
+
+
+    // ==========================
+    // Final Response
+    // ==========================
+
+    res.status(200).json({
+      success: true,
+
+      summary: {
+        totalInvestors,
+        assetsUnderManagement,
+        pendingInvites
+      },
+
+      investors
+    });
+
+  } catch (error) {
+    console.error('Error fetching investors:', error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
 };
+
+const getInvestorDetails = async (req, res) => {
+  try {
+    const { investorId } = req.params;
+
+    /* =============================
+       1️⃣ Validate Investor
+    ============================== */
+    const investor = await User.findById(investorId).select(
+      'firstName lastName email status lastLogin createdAt role'
+    );
+
+    if (!investor || investor.role !== 'Investor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Investor not found'
+      });
+    }
+
+
+    /* =============================
+       2️⃣ Fetch Ownership Records
+    ============================== */
+    const ownerships = await Ownership.find({
+      investor: investorId
+    })
+      .populate({
+        path: 'unit',
+        select: 'unitNo status property',
+        populate: {
+          path: 'property',
+          select: 'name location'
+        }
+      })
+      .sort({ createdAt: -1 });
+
+
+    /* =============================
+       3️⃣ Calculate Summary Stats
+    ============================== */
+    let totalInvestment = 0;
+    const uniqueProperties = new Set();
+
+    ownerships.forEach(record => {
+      totalInvestment += record.amountPaid || 0;
+
+      if (record.unit?.property?._id) {
+        uniqueProperties.add(record.unit.property._id.toString());
+      }
+    });
+
+
+    /* =============================
+       4️⃣ Fetch Investor Documents
+    ============================== */
+    const documents = await PropertyDocument.find({
+      investor: investorId
+    })
+      .populate('property', 'name')
+      .populate('unit', 'unitNo')
+      .sort({ createdAt: -1 });
+
+
+    /* =============================
+       5️⃣ Format Portfolio
+    ============================== */
+    const portfolio = ownerships.map(record => ({
+      ownershipId: record._id,
+      propertyId: record.unit?.property?._id,
+      propertyName: record.unit?.property?.name,
+      propertyLocation: record.unit?.property?.location,
+      unitId: record.unit?._id,
+      unitNo: record.unit?.unitNo,
+      unitStatus: record.unit?.status,
+      amountPaid: record.amountPaid,
+      assignedDate: record.createdAt
+    }));
+
+
+    /* =============================
+       6️⃣ Response
+    ============================== */
+    return res.status(200).json({
+      success: true,
+
+      investor: {
+        id: investor._id,
+        fullName: `${investor.firstName} ${investor.lastName}`,
+        email: investor.email,
+        status: investor.status,
+        lastLogin: investor.lastLogin,
+        joinedAt: investor.createdAt
+      },
+
+      summary: {
+        totalInvestment,
+        propertiesOwned: uniqueProperties.size,
+        unitsOwned: ownerships.length
+      },
+
+      portfolio,
+      documents
+    });
+
+  } catch (error) {
+    console.error('Investor details error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch investor details'
+    });
+  }
+};
+
+
+
 
 const getAllTenants = async (req, res) => {
     try {
@@ -300,6 +508,7 @@ module.exports = {
     createProperty,
     fetchProperties,
     getAllInvestors,
+    getInvestorDetails,
     getAllTenants,
     updateProperty
 };

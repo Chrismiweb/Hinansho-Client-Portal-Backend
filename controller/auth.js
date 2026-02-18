@@ -13,6 +13,9 @@ const Otp = require("../model/otp");
 const blacklist = new Set();
 const userDashboardModel = require("../model/userDashboard");
 const passport = require("passport");
+const fs = require("fs");
+const path = require("path");
+const sendEmail = require("../middleware/mailService");
 const { generateOTP, comparePassword, generateToken } = require("../utilis/helpers");
 
   
@@ -350,137 +353,238 @@ const registerAccount = async (req, res) => {
   }
 };
 
+// const createInvestorByAdmin = async (req, res) => {
+//   try {
+//     const adminId = req.user._id;
+
+//     const { username, email, fullName, phone } = req.body;
+
+//     // 1️⃣ Required fields
+//     const required = ['username', 'email', 'fullName'];
+//     const missing = required.filter(k => !req.body[k]);
+//     if (missing.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Missing: ${missing.join(', ')}`
+//       });
+//     }
+
+//     const normalisedEmail = email.toLowerCase().trim();
+
+//     // 2️⃣ Duplicate checks
+//     if (await User.findOne({ email: normalisedEmail })) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Email already exists'
+//       });
+//     }
+
+//     if (await User.findOne({ username })) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Username already exists'
+//       });
+//     }
+
+//     // 3️⃣ Generate secure temporary password
+//     const tempPassword = crypto.randomBytes(6).toString('base64'); // ~10 chars
+
+//     const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+//     // 4️⃣ Create investor user
+//     const investor = await User.create({
+//       username,
+//       email: normalisedEmail,
+//       password: hashedPassword,
+//       role: 'Investor',
+//       isVerified: true,
+//       forcePasswordChange: true,
+//       createdBy: adminId
+//     });
+
+//     // 5️⃣ Send login credentials email
+//     await transporter.sendMail({
+//       from: { name: 'Hinansho Client Portal', address: process.env.ADMIN_EMAIL },
+//       to: normalisedEmail,
+//       subject: 'Your Investor Account Has Been Created',
+//       html: `
+// <!DOCTYPE html>
+// <html>
+// <head>
+//   <meta charset="UTF-8" />
+//   <title>Investor Account Created</title>
+// </head>
+// <body style="background:#F5F7FB;font-family:Segoe UI,Arial,sans-serif;">
+//   <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:14px;box-shadow:0 6px 25px rgba(0,0,0,.08);overflow:hidden">
+    
+//     <div style="padding:28px;text-align:center;border-bottom:2px solid #C9A24D">
+//       <img src="cid:logo" width="90" />
+//       <h2>Hinansho Client Portal</h2>
+//     </div>
+
+//     <div style="padding:32px">
+//       <h3>Hello ${fullName},</h3>
+
+//       <p>
+//         An investor account has been created for you on the
+//         <strong>Hinansho Client Portal</strong>.
+//       </p>
+
+//       <div style="background:#F8FAFC;padding:16px;border-left:4px solid #C9A24D;border-radius:8px">
+//         <p><strong>Login Details:</strong></p>
+//         <p>Email: ${normalisedEmail}</p>
+//         <p>Username: ${username}</p>
+//         <p>Temporary Password: <strong>${tempPassword}</strong></p>
+//       </div>
+
+//       <p>
+//         For security reasons, you will be required to change your password
+//         immediately after your first login.
+//       </p>
+
+//       <p>
+//         Login here: <br />
+//         <a href="${process.env.CLIENT_PORTAL_URL}">
+//           ${process.env.CLIENT_PORTAL_URL}
+//         </a>
+//       </p>
+
+//       <p>
+//         If you have any questions, please contact our support team.
+//       </p>
+//     </div>
+
+//     <div style="background:#0F172A;color:#CBD5E1;font-size:12px;text-align:center;padding:18px">
+//       © ${new Date().getFullYear()} Hinansho Management
+//     </div>
+
+//   </div>
+// </body>
+// </html>
+//       `,
+//       attachments: [
+//         {
+//           filename: "logo.png",
+//           path: "./Hinansho Gold 2 1.png",
+//           cid: "logo",
+//         },
+//       ],
+//     });
+
+//     // 6️⃣ Success response
+//     res.status(201).json({
+//       success: true,
+//       message: 'Investor account created and credentials sent via email',
+//       investor: {
+//         id: investor._id,
+//         email: investor.email,
+//         username: investor.username
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('Create investor error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message
+//     });
+//   }
+// };
+
+// Verify Register OTP
+
 const createInvestorByAdmin = async (req, res) => {
   try {
     const adminId = req.user._id;
-
     const { username, email, fullName, phone } = req.body;
 
-    // 1️⃣ Required fields
-    const required = ['username', 'email', 'fullName'];
+    // Required fields
+    const required = ["username", "email", "fullName"];
     const missing = required.filter(k => !req.body[k]);
+
     if (missing.length) {
       return res.status(400).json({
         success: false,
-        message: `Missing: ${missing.join(', ')}`
+        message: `Missing: ${missing.join(", ")}`
       });
     }
 
     const normalisedEmail = email.toLowerCase().trim();
 
-    // 2️⃣ Duplicate checks
+    // Duplicate checks
     if (await User.findOne({ email: normalisedEmail })) {
       return res.status(400).json({
         success: false,
-        message: 'Email already exists'
+        message: "Email already exists"
       });
     }
 
     if (await User.findOne({ username })) {
       return res.status(400).json({
         success: false,
-        message: 'Username already exists'
+        message: "Username already exists"
       });
     }
 
-    // 3️⃣ Generate secure temporary password
-    const tempPassword = crypto.randomBytes(6).toString('base64'); // ~10 chars
-
+    // Generate temp password
+    const tempPassword = crypto.randomBytes(6).toString("base64");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    // 4️⃣ Create investor user
+    // Create investor
     const investor = await User.create({
       username,
       email: normalisedEmail,
       password: hashedPassword,
-      role: 'Investor',
+      firstName: fullName.split(" ")[0],
+      lastName: fullName.split(" ").slice(1).join(" "),
+      phone,
+      role: "Investor",
       isVerified: true,
       forcePasswordChange: true,
       createdBy: adminId
     });
 
-    // 5️⃣ Send login credentials email
-    await transporter.sendMail({
-      from: { name: 'Hinansho Client Portal', address: process.env.ADMIN_EMAIL },
+    // Load logo
+    const logoPath = path.join(__dirname, "../Hinansho Gold 2 1.png");
+    const logoBuffer = fs.readFileSync(logoPath);
+
+    // Send email
+    await sendEmail({
       to: normalisedEmail,
-      subject: 'Your Investor Account Has Been Created',
+      subject: "Your Investor Account Has Been Created",
+
       html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Investor Account Created</title>
-</head>
-<body style="background:#F5F7FB;font-family:Segoe UI,Arial,sans-serif;">
-  <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:14px;box-shadow:0 6px 25px rgba(0,0,0,.08);overflow:hidden">
-    
-    <div style="padding:28px;text-align:center;border-bottom:2px solid #C9A24D">
-      <img src="cid:logo" width="90" />
-      <h2>Hinansho Client Portal</h2>
-    </div>
+        <h2>Hello ${fullName}</h2>
 
-    <div style="padding:32px">
-      <h3>Hello ${fullName},</h3>
+        <p>Your investor account has been created.</p>
 
-      <p>
-        An investor account has been created for you on the
-        <strong>Hinansho Client Portal</strong>.
-      </p>
+        <p><strong>Email:</strong> ${normalisedEmail}</p>
+        <p><strong>Username:</strong> ${username}</p>
+        <p><strong>Temporary Password:</strong> ${tempPassword}</p>
 
-      <div style="background:#F8FAFC;padding:16px;border-left:4px solid #C9A24D;border-radius:8px">
-        <p><strong>Login Details:</strong></p>
-        <p>Email: ${normalisedEmail}</p>
-        <p>Username: ${username}</p>
-        <p>Temporary Password: <strong>${tempPassword}</strong></p>
-      </div>
-
-      <p>
-        For security reasons, you will be required to change your password
-        immediately after your first login.
-      </p>
-
-      <p>
-        Login here: <br />
-        <a href="${process.env.CLIENT_PORTAL_URL}">
-          ${process.env.CLIENT_PORTAL_URL}
-        </a>
-      </p>
-
-      <p>
-        If you have any questions, please contact our support team.
-      </p>
-    </div>
-
-    <div style="background:#0F172A;color:#CBD5E1;font-size:12px;text-align:center;padding:18px">
-      © ${new Date().getFullYear()} Hinansho Management
-    </div>
-
-  </div>
-</body>
-</html>
+        <p>Please change your password after first login.</p>
       `,
+
       attachments: [
         {
           filename: "logo.png",
-          path: "./Hinansho Gold 2 1.png",
-          cid: "logo",
-        },
-      ],
+          content: logoBuffer.toString("base64"),
+          type: "image/png",
+          disposition: "inline",
+          content_id: "logo"
+        }
+      ]
     });
 
-    // 6️⃣ Success response
     res.status(201).json({
       success: true,
-      message: 'Investor account created and credentials sent via email',
-      investor: {
-        id: investor._id,
-        email: investor.email,
-        username: investor.username
-      }
+      message: "Investor created and email sent",
+      investor
     });
 
   } catch (error) {
-    console.error('Create investor error:', error);
+    console.error("Create investor error:", error);
+
     res.status(500).json({
       success: false,
       message: error.message
@@ -488,7 +592,6 @@ const createInvestorByAdmin = async (req, res) => {
   }
 };
 
-// Verify Register OTP
 const verifyRegOTP = async (req, res) => {
     try {
         const { otp } = req.body;
