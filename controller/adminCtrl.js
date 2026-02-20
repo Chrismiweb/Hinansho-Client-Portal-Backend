@@ -271,7 +271,7 @@ const getAllInvestors = async (req, res) => {
     $project: {
       fullName: 1,
       email: 1,
-      phone: 1,            // ✅ include phone number
+      phone_number: 1,            // ✅ include phone number
       status: 1,
       lastLogin: 1,
       totalInvestment: 1,
