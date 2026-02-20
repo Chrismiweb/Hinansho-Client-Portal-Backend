@@ -225,43 +225,61 @@ const getAllInvestors = async (req, res) => {
     // ==========================
     const investors = await User.aggregate([
 
-      { $match: { role: 'Investor' } },
+  { $match: { role: 'Investor' } },
 
-      {
-        $lookup: {
-          from: 'ownerships',
-          localField: '_id',
-          foreignField: 'investor',
-          as: 'ownerships'
+  {
+    $lookup: {
+      from: 'ownerships',
+      localField: '_id',
+      foreignField: 'investor',
+      as: 'ownerships'
+    }
+  },
+
+  {
+    $addFields: {
+
+      totalInvestment: {
+        $ifNull: [{ $sum: '$ownerships.amountPaid' }, 0]
+      },
+
+      propertiesCount: {
+        $size: {
+          $ifNull: [
+            { $setUnion: ['$ownerships.property'] },
+            []
+          ]
         }
       },
 
-      {
-        $addFields: {
-          totalInvestment: { $sum: '$ownerships.amountPaid' },
-          propertiesCount: {
-            $size: {
-              $setUnion: ['$ownerships.property']
-            }
-          },
-          fullName: {
-            $concat: ['$firstName', ' ', '$lastName']
+      fullName: {
+        $trim: {
+          input: {
+            $concat: [
+              { $ifNull: ['$firstname', ''] },
+              ' ',
+              { $ifNull: ['$lastname', ''] }
+            ]
           }
-        }
-      },
-
-      {
-        $project: {
-          fullName: 1,
-          email: 1,
-          status: 1,
-          lastLogin: 1,
-          totalInvestment: 1,
-          propertiesCount: 1
         }
       }
 
-    ]);
+    }
+  },
+
+  {
+    $project: {
+      fullName: 1,
+      email: 1,
+      phone: 1,            // ✅ include phone number
+      status: 1,
+      lastLogin: 1,
+      totalInvestment: 1,
+      propertiesCount: 1
+    }
+  }
+
+]);
 
 
     // ==========================
