@@ -617,7 +617,7 @@ const createInvestorByAdmin = async (req, res) => {
       role: "Investor",
       firstname: fullName.split(" ")[0],
       lastname: fullName.split(" ").slice(1).join(" "),
-      phone,
+      phone_number: phone,
       isVerified: true,
       forcePasswordChange: true,
       createdBy: adminId
