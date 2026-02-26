@@ -1,5 +1,5 @@
 const express = require('express');
-const { getRentSummary, getRentHistory, getPendingPayments, fetchMyDocuments, investorFinanceSummary } = require('../controller/investorCtrl');
+const { getRentSummary, getRentHistory, getPendingPayments, fetchMyDocuments, investorFinanceSummary, getInvestorProperties } = require('../controller/investorCtrl');
 
 
 
@@ -10,6 +10,7 @@ investorRouters.get('/rent/history', getRentHistory);
 investorRouters.get('/rent/pending', getPendingPayments);
 investorRouters.get('/documents', fetchMyDocuments);
 investorRouters.get('/finance/summary', investorFinanceSummary);
+investorRouters.get('/properties', getInvestorProperties);
 
 
 module.exports = investorRouters; 

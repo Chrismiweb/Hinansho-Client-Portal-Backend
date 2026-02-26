@@ -164,7 +164,7 @@ const assignUnitToInvestor = async (req, res) => {
 
       // 5️⃣ Update unit
       unit.investor = investor._id;
-      unit.status = 'owned';
+      unit.status = 'occupied';
       await unit.save({ session });
 
       return newOwnership;
