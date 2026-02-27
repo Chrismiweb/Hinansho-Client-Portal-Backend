@@ -185,6 +185,74 @@ const assignUnitToInvestor = async (req, res) => {
   }
 };
 
+const assignPropertyToInvestor = async (req, res) => {
+  const adminId = req.user._id;
+  const { propertyId, investorId, amountPaid } = req.body;
+
+  if (!propertyId || !investorId || !amountPaid) {
+    return res.status(400).json({
+      success: false,
+      message: 'propertyId, investorId and amountPaid are required'
+    });
+  }
+
+  try {
+    const ownership = await withTransaction(async (session) => {
+
+      // 1️⃣ Validate property
+      const property = await Property.findById(propertyId).session(session);
+      if (!property) {
+        throw new Error('Property not found');
+      }
+
+      if (property.type !== 'land') {
+        throw new Error('This endpoint is only for land properties');
+      }
+
+      // 2️⃣ Prevent double ownership
+      const existing = await Ownership.findOne({
+        property: propertyId,
+        unit: null
+      }).session(session);
+
+      if (existing) {
+        throw new Error('This land is already assigned');
+      }
+
+      // 3️⃣ Validate investor
+      const investor = await User.findById(investorId).session(session);
+      if (!investor || investor.role !== 'Investor') {
+        throw new Error('Invalid investor');
+      }
+
+      // 4️⃣ Create ownership
+      const [newOwnership] = await Ownership.create([{
+        investor: investor._id,
+        property: property._id,
+        unit: null, // IMPORTANT
+        amountPaid,
+        assignedBy: adminId
+      }], { session });
+
+      return newOwnership;
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Land assigned successfully',
+      ownership
+    });
+
+  } catch (error) {
+    console.error('Assign property error:', error.message);
+
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 const assignTenantsToUnit = async (req, res) => {
   try {
     const adminId = req.user._id;
@@ -626,6 +694,7 @@ module.exports = {
   getAvailableUnits,
   uploadPropertyDocuments,
   assignUnitToInvestor,
+  assignPropertyToInvestor,
   assignTenantsToUnit,
   updateUnit,
   deleteUnit,

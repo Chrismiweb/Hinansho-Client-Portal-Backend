@@ -15,7 +15,7 @@ const unitSchema = new mongoose.Schema({
 
   type: {
     type: String,
-    enum: ['hostel', 'land', 'apartment'],
+    enum: ['hostel', 'land',],
     required: true
   },
 
