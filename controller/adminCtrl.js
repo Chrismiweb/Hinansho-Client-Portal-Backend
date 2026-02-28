@@ -5,6 +5,7 @@ const fs = require('fs');
 const Property = require('../model/property');
 const Ownership = require('../model/owner');
 const PropertyDocument = require('../model/propertyDocument');
+const Unit = require('../model/unit');
 
 // Suspend a user account
 const suspendUser = async (req, res) => {
@@ -516,6 +517,42 @@ const updateProperty = async (req, res) => {
   }
 };
 
+//delete property
+const deleteProperty = async (req, res) => {
+    const { propertyId } = req.params;
+    try {
+        const property = await Property.findById(propertyId);
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: 'Property not found'
+            });
+        }
+
+        await Property.findByIdAndDelete(propertyId);
+
+        //delete all ownerships related to this property
+        await Ownership.deleteMany({ property: propertyId });
+
+        //delete all documents related to this property
+        await PropertyDocument.deleteMany({ property: propertyId });
+
+        //delete units related to this property
+        await Unit.deleteMany({ property: propertyId });
+
+        res.status(200).json({
+            success: true,
+            message: 'Property deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Delete property error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 
 module.exports = {
     suspendUser,
@@ -528,5 +565,6 @@ module.exports = {
     getAllInvestors,
     getInvestorDetails,
     getAllTenants,
-    updateProperty
+    updateProperty,
+    deleteProperty
 };

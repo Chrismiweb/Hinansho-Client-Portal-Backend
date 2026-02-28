@@ -1,5 +1,5 @@
 const express = require('express');
-const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails} = require('../controller/adminCtrl');
+const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails, deleteProperty} = require('../controller/adminCtrl');
 const { upload } = require('../controller/uploadProfilePic');
 const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument, getPendingPayments, approvePayment, rejectPayment, assignPropertyToInvestor } = require('../controller/adminUnitCtrl');
 const { createInvestorByAdmin } = require('../controller/auth');
@@ -28,6 +28,7 @@ routers.get('/investors/:investorId/documents', fetchPropertyDocuments);
 routers.post('/assign-tenants', assignTenantsToUnit);
 routers.put('/update-unit/:unitId', updateUnit);
 routers.put('/update-property/:propertyId', upload.single('image'), updateProperty);
+routers.delete('/delete-property/:propertyId', deleteProperty);
 routers.delete('/delete-unit/:unitId', deleteUnit);
 routers.delete('/investors/:investorId/documents/:documentId', deletePropertyDocument);
 
