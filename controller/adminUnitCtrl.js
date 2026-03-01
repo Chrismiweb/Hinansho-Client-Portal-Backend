@@ -205,7 +205,7 @@ const assignPropertyToInvestor = async (req, res) => {
         throw new Error('Property not found');
       }
 
-      if (property.type !== 'land') {
+      if (property.property_type !== 'land') {
         throw new Error('This endpoint is only for land properties');
       }
 

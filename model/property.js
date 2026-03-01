@@ -7,7 +7,7 @@ const PropertySchema = new Schema({
 
   property_type: {
     type: String,
-    enum: ['hostel', 'apartment', 'land', 'commercial'],
+    enum: ['hostel', 'land'],
     required: true,
     index: true
   },
