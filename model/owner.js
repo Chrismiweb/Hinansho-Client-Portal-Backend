@@ -36,7 +36,9 @@ const OwnershipSchema = new Schema({
 
 OwnershipSchema.index(
   { unit: 1 },
-  { unique: true, sparse: true }
+  { unique: true, 
+    partialFilterExpression: {unit: {$ne:null}}
+  }
 );
 
 module.exports = model('Ownership', OwnershipSchema);
