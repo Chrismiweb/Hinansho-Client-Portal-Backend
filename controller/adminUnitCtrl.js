@@ -189,47 +189,35 @@ const assignPropertyToInvestor = async (req, res) => {
   const adminId = req.user._id;
   const { propertyId, investorId, amountPaid } = req.body;
 
-  if (!propertyId || !investorId || !amountPaid) {
-    return res.status(400).json({
-      success: false,
-      message: 'propertyId, investorId and amountPaid are required'
-    });
-  }
-
   try {
     const ownership = await withTransaction(async (session) => {
 
-      // 1️⃣ Validate property
       const property = await Property.findById(propertyId).session(session);
-      if (!property) {
-        throw new Error('Property not found');
-      }
+      if (!property) throw new Error('Property not found');
 
       if (property.property_type !== 'land') {
-        throw new Error('This endpoint is only for land properties');
+        throw new Error('Only land can use this endpoint');
       }
 
-      // 2️⃣ Prevent double ownership
-      const existing = await Ownership.findOne({
-        property: propertyId,
-        unit: null
-      }).session(session);
-
-      if (existing) {
-        throw new Error('This land is already assigned');
-      }
-
-      // 3️⃣ Validate investor
       const investor = await User.findById(investorId).session(session);
       if (!investor || investor.role !== 'Investor') {
         throw new Error('Invalid investor');
       }
 
-      // 4️⃣ Create ownership
+      const alreadyAssigned = await Ownership.findOne({
+        property: propertyId,
+        investor: investorId,
+        unit: null
+      }).session(session);
+
+      if (alreadyAssigned) {
+        throw new Error('Investor already owns this land');
+      }
+
       const [newOwnership] = await Ownership.create([{
-        investor: investor._id,
-        property: property._id,
-        unit: null, // IMPORTANT
+        investor: investorId,
+        property: propertyId,
+        unit: null,
         amountPaid,
         assignedBy: adminId
       }], { session });
@@ -244,8 +232,6 @@ const assignPropertyToInvestor = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Assign property error:', error.message);
-
     res.status(400).json({
       success: false,
       message: error.message

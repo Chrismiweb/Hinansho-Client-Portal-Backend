@@ -4,13 +4,15 @@ const OwnershipSchema = new Schema({
   investor: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true
   },
 
   property: {
     type: Schema.Types.ObjectId,
     ref: 'Property',
-    required: true
+    required: true,
+    index: true
   },
 
   unit: {
