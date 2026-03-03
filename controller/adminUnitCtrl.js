@@ -510,11 +510,16 @@ const uploadPropertyDocuments = async (req, res) => {
     const protocol = req.protocol;
     const host = req.get('host');
 
+    // record investor name instead of Id in document for easier retrieval and display
+    const investorName = investor.name;
+    const propertyName = property.name;
+
     // 3️⃣ Save documents
     const savedFiles = await Promise.all(
       req.files.map(file => {
         return PropertyDocument.create({
           investor: investorId,
+          investorName: investorName,
           property: propertyId || null,
           unit: unit ? unit._id : null,
           documentType: documentType || 'legal',
