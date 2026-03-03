@@ -521,6 +521,7 @@ const uploadPropertyDocuments = async (req, res) => {
           investor: investorId,
           investorName: investorName,
           property: propertyId || null,
+          propertyName: propertyName || null,
           unit: unit ? unit._id : null,
           documentType: documentType || 'legal',
           fileUrl: `${protocol}://${host}/uploads/documents/${file.filename}`,
