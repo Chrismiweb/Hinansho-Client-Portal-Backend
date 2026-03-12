@@ -345,7 +345,7 @@ const getInvestorDetails = async (req, res) => {
        1️⃣ Validate Investor
     ============================== */
     const investor = await User.findById(investorId).select(
-      'firstName lastName email status lastLogin createdAt role'
+      'firstname lastname email phone_number status lastLogin createdAt role'
     );
 
     if (!investor || investor.role !== 'Investor') {
@@ -423,8 +423,9 @@ const getInvestorDetails = async (req, res) => {
 
       investor: {
         id: investor._id,
-        fullName: `${investor.firstName} ${investor.lastName}`,
+        fullName: `${investor.firstname} ${investor.lastname}`,
         email: investor.email,
+        phone_number: investor.phone_number,
         status: investor.status,
         lastLogin: investor.lastLogin,
         joinedAt: investor.createdAt
