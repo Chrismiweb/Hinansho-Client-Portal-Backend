@@ -1,5 +1,5 @@
 const express = require('express');
-const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails, deleteProperty} = require('../controller/adminCtrl');
+const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails, deleteProperty, updateInvestorStatus} = require('../controller/adminCtrl');
 const { upload } = require('../controller/uploadProfilePic');
 const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument, getPendingPayments, approvePayment, rejectPayment, assignPropertyToInvestor } = require('../controller/adminUnitCtrl');
 const { createInvestorByAdmin } = require('../controller/auth');
@@ -20,6 +20,7 @@ routers.post('/create-unit', createUnit);
 routers.get('/units/property/:propertyId', getUnitsByProperty); 
 routers.get('/units/available', getAvailableUnits);
 routers.post('/assign-unit', assignUnitToInvestor);
+routers.post('/investors/:investorId/status', updateInvestorStatus);
 routers.post('/assign-property', assignPropertyToInvestor);
 routers.post('/investors/:investorId/documents', uploadDocuments.array('documents', 10), uploadPropertyDocuments);
 routers.post('/rent/approve/:paymentId', approvePayment);

@@ -35,6 +35,18 @@ const userSchema = new Schema(
       enum: ["Admin", "Investor", "Tenant"],
       required: true,
     },
+    status: {
+      type: String,
+      enum: ['Active', 'Deactivated', 'Pending'],
+      default: 'Active'
+    },
+
+    deactivatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+
+    deactivatedAt: Date,
     permissions: { type: [String], default: [] },
     twoFactorSecret: { type: String },
     is2FAEnabled: { type: Boolean, default: false },

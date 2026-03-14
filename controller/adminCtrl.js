@@ -451,7 +451,55 @@ const getInvestorDetails = async (req, res) => {
   }
 };
 
+//deactivate investor account
+const updateInvestorStatus = async (req, res) => {
+  try {
+    const adminId = req.user._id;
+    const { investorId } = req.params;
+    const { status } = req.body;
 
+    const allowedStatuses = [
+      'Active',
+      'Deactivated',
+      'Pending'
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status'
+      });
+    }
+
+    const investor = await User.findById(investorId);
+
+    if (!investor || investor.role !== 'Investor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Investor not found'
+      });
+    }
+
+    investor.status = status;
+    investor.statusUpdatedBy = adminId;
+    investor.statusUpdatedAt = new Date();
+
+    await investor.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Investor status updated to ${status}`
+    });
+
+  } catch (error) {
+    console.error('Update investor status error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update investor status'
+    });
+  }
+};
 
 
 const getAllTenants = async (req, res) => {
@@ -564,6 +612,7 @@ module.exports = {
     createProperty,
     fetchProperties,
     getAllInvestors,
+    updateInvestorStatus,
     getInvestorDetails,
     getAllTenants,
     updateProperty,

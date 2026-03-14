@@ -618,6 +618,7 @@ const createInvestorByAdmin = async (req, res) => {
       firstname: fullName.split(" ")[0],
       lastname: fullName.split(" ").slice(1).join(" "),
       phone_number: phone,
+      status: "Pending",
       isVerified: true,
       forcePasswordChange: true,
       createdBy: adminId
@@ -1112,6 +1113,12 @@ const login = async (req, res) => {
       }
 
     }
+    //save last login
+    user.lastLogin = new Date();
+
+    // change user status to active and save
+    user.status = 'Active';
+    await user.save();
 
     const token = generateToken(user); // Make sure this includes userId
 
@@ -1122,9 +1129,11 @@ const login = async (req, res) => {
         message: 'Password change required',
         token,
         user: {
+          username: user.username,
           id: user._id,
           email: user.email,
-          role: user.role
+          role: user.role,
+          lastLogin: user.lastLogin
         }
       });
     }
@@ -1135,9 +1144,11 @@ const login = async (req, res) => {
       token,
       forcePasswordChange: false,
       user: {
+        username: user.username,
         id: user._id,
         email: user.email,
-        role: user.role
+        role: user.role,
+        lastLogin: user.lastLogin
       }
     });
   } catch (err) {
