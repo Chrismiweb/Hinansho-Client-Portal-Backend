@@ -176,7 +176,7 @@ const createProperty = async (req, res) => {
     const protocol = req.protocol;
     const host = req.get('host');
 
-    const imageUrl = `${protocol}://${host}/uploads/documents/${req.file.filename}`;
+    const imageUrl = `${protocol}://${host}/uploads/propery_images/${req.file.filename}`;
 
     const newProperty = await Property.create({
       name,

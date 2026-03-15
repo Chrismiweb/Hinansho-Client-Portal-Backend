@@ -30,7 +30,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 }));
 app.use(helmet());
-app.use(express.json(limit = '600mb'));
+app.use(express.json({limit: '600mb'}));
 app.use(express.urlencoded({ extended: true, limit: '600mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
