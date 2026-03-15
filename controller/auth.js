@@ -1129,6 +1129,8 @@ const login = async (req, res) => {
         message: 'Password change required',
         token,
         user: {
+          // firstname: user.firstname,
+          // lastname: user.lastname,
           username: user.username,
           id: user._id,
           email: user.email,
@@ -1144,6 +1146,8 @@ const login = async (req, res) => {
       token,
       forcePasswordChange: false,
       user: {
+        firstname: user.firstname,
+        lastname: user.lastname,
         username: user.username,
         id: user._id,
         email: user.email,
