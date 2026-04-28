@@ -173,10 +173,8 @@ const createProperty = async (req, res) => {
     }
 
     // Build URL dynamically (works everywhere)
-    const protocol = req.protocol;
-    const host = req.get('host');
-
-    const imageUrl = `${protocol}://${host}/uploads/propery_images/${req.file.filename}`;
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const imageUrl = `${baseUrl}/uploads/property_images/${req.file.filename}`;
 
     const newProperty = await Property.create({
       name,
@@ -544,9 +542,8 @@ const updateProperty = async (req, res) => {
 
     // Optional image replacement
     if (req.file) {
-      const protocol = req.protocol;
-      const host = req.get('host');
-      property.image = `${protocol}://${host}/uploads/property_image/${req.file.filename}`;
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+      property.images = [`${baseUrl}/uploads/property_images/${req.file.filename}`];
     }
 
     await property.save();
