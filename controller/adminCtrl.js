@@ -618,3 +618,114 @@ module.exports = {
     updateProperty,
     deleteProperty
 };
+
+// ─── Admin Dashboard Stats ───────────────────────────────────────────────────
+// GET /admin/dashboard-stats
+// Returns: AUM, totalClients, rentalIncome, actionRequired, topInvestors
+const getAdminDashboardStats = async (req, res) => {
+  try {
+    const Rent = require('../model/rent');
+    const RentPaymentRequest = require('../model/rentPayment');
+
+    // 1. AUM — total amountPaid across all ownerships
+    const aumAgg = await Ownership.aggregate([
+      { $group: { _id: null, total: { $sum: '$amountPaid' } } }
+    ]);
+    const aum = aumAgg[0]?.total || 0;
+
+    // 2. Total Clients — investors + tenants
+    const [investorCount, tenantCount] = await Promise.all([
+      User.countDocuments({ role: 'Investor' }),
+      User.countDocuments({ role: 'Tenant' })
+    ]);
+    const totalClients = investorCount + tenantCount;
+
+    // 3. Rental Income — sum of all approved rent payments
+    const rentalAgg = await Rent.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const rentalIncome = rentalAgg[0]?.total || 0;
+
+    // 4. Action Required — count of pending rent payment requests
+    const actionRequired = await RentPaymentRequest.countDocuments({ status: 'pending' });
+
+    // 5. Top Investors — top 5 by total investment
+    const topInvestors = await User.aggregate([
+      { $match: { role: 'Investor' } },
+      {
+        $lookup: {
+          from: 'ownerships',
+          localField: '_id',
+          foreignField: 'investor',
+          as: 'ownerships'
+        }
+      },
+      {
+        $addFields: {
+          totalInvestment: { $ifNull: [{ $sum: '$ownerships.amountPaid' }, 0] },
+          propertiesCount: { $size: { $ifNull: [{ $setUnion: ['$ownerships.property'] }, []] } },
+          fullName: {
+            $trim: {
+              input: { $concat: [{ $ifNull: ['$firstname', ''] }, ' ', { $ifNull: ['$lastname', ''] }] }
+            }
+          }
+        }
+      },
+      { $sort: { totalInvestment: -1 } },
+      { $limit: 5 },
+      { $project: { fullName: 1, email: 1, totalInvestment: 1, propertiesCount: 1 } }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      stats: { aum, totalClients, rentalIncome, actionRequired },
+      topInvestors
+    });
+
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── Enriched fetchProperties ─────────────────────────────────────────────────
+// GET /admin/fetch-properties   (replaces the old one — adds clientCount + aum per property)
+const fetchPropertiesEnriched = async (req, res) => {
+  try {
+    const properties = await Property.find().populate('createdBy', 'name email').lean();
+
+    // Aggregate per-property: investor count + AUM
+    const propertyStats = await Ownership.aggregate([
+      {
+        $group: {
+          _id: '$property',
+          clientCount: { $addToSet: '$investor' },
+          aumPerProject: { $sum: '$amountPaid' }
+        }
+      },
+      {
+        $project: {
+          clientCount: { $size: '$clientCount' },
+          aumPerProject: 1
+        }
+      }
+    ]);
+
+    const statsMap = {};
+    propertyStats.forEach(s => { statsMap[s._id.toString()] = s; });
+
+    const enriched = properties.map(p => ({
+      ...p,
+      clientCount: statsMap[p._id.toString()]?.clientCount || 0,
+      aumPerProject: statsMap[p._id.toString()]?.aumPerProject || 0
+    }));
+
+    res.status(200).json({ success: true, properties: enriched });
+  } catch (error) {
+    console.error('Error fetching properties:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports.getAdminDashboardStats = getAdminDashboardStats;
+module.exports.fetchPropertiesEnriched = fetchPropertiesEnriched;

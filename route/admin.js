@@ -1,5 +1,5 @@
 const express = require('express');
-const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails, deleteProperty, updateInvestorStatus} = require('../controller/adminCtrl');
+const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails, deleteProperty, updateInvestorStatus, getAdminDashboardStats, fetchPropertiesEnriched} = require('../controller/adminCtrl');
 const { upload } = require('../controller/uploadProfilePic');
 const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument, getPendingPayments, approvePayment, rejectPayment, assignPropertyToInvestor } = require('../controller/adminUnitCtrl');
 const { createInvestorByAdmin } = require('../controller/auth');
@@ -33,5 +33,9 @@ routers.delete('/delete-property/:propertyId', deleteProperty);
 routers.delete('/delete-unit/:unitId', deleteUnit);
 routers.delete('/investors/:investorId/documents/:documentId', deletePropertyDocument);
 
+
+routers.get('/dashboard-stats', getAdminDashboardStats);
+// fetch-properties-enriched replaces old /fetch-properties for the overview table
+routers.get('/fetch-properties-enriched', fetchPropertiesEnriched);
 
 module.exports = routers;
