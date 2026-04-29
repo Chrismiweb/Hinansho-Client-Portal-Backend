@@ -269,9 +269,11 @@ const getAllInvestors = async (req, res) => {
     $project: {
       fullName: 1,
       email: 1,
-      phone_number: 1,            // ✅ include phone number
+      phone_number: 1,
       status: 1,
       lastLogin: 1,
+      forcePasswordChange: 1,     // ✅ needed to derive real Pending status on frontend
+      createdAt: 1,               // ✅ needed for sorting newest first
       totalInvestment: 1,
       propertiesCount: 1
     }
