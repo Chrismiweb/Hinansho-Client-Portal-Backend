@@ -1116,8 +1116,11 @@ const login = async (req, res) => {
     //save last login
     user.lastLogin = new Date();
 
-    // change user status to active and save
-    user.status = 'Active';
+    // Only mark Active once they've actually completed onboarding (password changed).
+    // If forcePasswordChange is still true they haven't finished setup yet → keep Pending.
+    if (!user.forcePasswordChange) {
+      user.status = 'Active';
+    }
     await user.save();
 
     const token = generateToken(user); // Make sure this includes userId
@@ -1952,6 +1955,8 @@ const changePassword = async (req, res) => {
     // 🔐 FORCE CHANGE (ADMIN-CREATED USERS)
     user.password = await bcrypt.hash(newPassword, 10);
     user.forcePasswordChange = false;
+    // Now that they've completed setup, mark them as Active
+    user.status = 'Active';
 
     await user.save();
     res.status(200).json({
