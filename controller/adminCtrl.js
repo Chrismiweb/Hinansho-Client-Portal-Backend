@@ -289,10 +289,18 @@ const getAllInvestors = async (req, res) => {
       role: 'Investor'
     });
 
-    // Pending Invites
+    // Pending Invites — anyone who hasn't fully completed onboarding:
+    // 1. status is 'Pending' (default for new users, cleared on password change)
+    // 2. forcePasswordChange is true (logged in but hasn't changed password yet)
+    // 3. lastLogin is null/undefined (never logged in at all — self-heals old Active defaults)
     const pendingInvites = await User.countDocuments({
       role: 'Investor',
-      status: 'Pending'
+      $or: [
+        { status: 'Pending' },
+        { forcePasswordChange: true },
+        { lastLogin: { $exists: false } },
+        { lastLogin: null }
+      ]
     });
 
     // Assets Under Management (AUM)
