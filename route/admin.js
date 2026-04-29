@@ -1,7 +1,6 @@
 const express = require('express');
 const {suspendUser,unsuspendUser,deleteUser,sendNotification, getAdminProfile, createProperty, fetchProperties, getAllInvestors, getAllTenants, updateProperty, getInvestorDetails, deleteProperty, updateInvestorStatus, getAdminDashboardStats, fetchPropertiesEnriched} = require('../controller/adminCtrl');
-const { upload } = require('../controller/uploadProfilePic');
-const { uploadPropertyImage } = require('../controller/uploadPropertyImage');
+const { uploadPropertyImage } = require('../config/cloudinary');
 const { createUnit, getUnitsByProperty, getAvailableUnits, assignUnitToInvestor, assignTenantsToUnit, deleteUnit, updateUnit, uploadPropertyDocuments, fetchPropertyDocuments, deletePropertyDocument, getPendingPayments, approvePayment, rejectPayment, assignPropertyToInvestor } = require('../controller/adminUnitCtrl');
 const { createInvestorByAdmin } = require('../controller/auth');
 const uploadDocuments = require('../middleware/uploadDocs');

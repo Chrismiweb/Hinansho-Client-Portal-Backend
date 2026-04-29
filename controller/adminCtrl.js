@@ -172,9 +172,8 @@ const createProperty = async (req, res) => {
       });
     }
 
-    // Build URL dynamically (works everywhere)
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-    const imageUrl = `${baseUrl}/uploads/property_images/${req.file.filename}`;
+    // Cloudinary returns the full URL directly in req.file.path
+    const imageUrl = req.file.path;
 
     const newProperty = await Property.create({
       name,
@@ -540,10 +539,9 @@ const updateProperty = async (req, res) => {
     if (status) property.status = status;
     if (expected_roi) property.expected_roi = expected_roi;
 
-    // Optional image replacement
+    // Optional image replacement — Cloudinary returns full URL in req.file.path
     if (req.file) {
-      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-      property.images = [`${baseUrl}/uploads/property_images/${req.file.filename}`];
+      property.images = [req.file.path];
     }
 
     await property.save();

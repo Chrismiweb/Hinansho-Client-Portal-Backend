@@ -1,39 +1,5 @@
-const multer = require('multer');
-const path = require('path');
 const User = require('../model/user')
-const fs = require('fs')
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const dir = 'uploads/profile_picture/';
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        cb(null, dir);
-    },
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${file.originalname}`);
-    },
-});
-
-const fileFilter = (req, file, cb) => {
-    const allowedType = /jpeg|jpg|png|gif/;
-    const extname = allowedType.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedType.test(file.mimetype)
-
-    if (extname && mimetype) {
-        cb(null, true)
-    } else {
-        cb(new Error("Only .jpeg, .jpg, .png, .gif, .pdf files are allowed"))
-    }
-}
-
-// Multer Upload Middleware
-const upload = multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: 500 * 1024 * 1024 } // 500MB max file size
-});
+const { uploadProfilePic: upload } = require('../config/cloudinary');
 
 const uploadProfilePicture = async (req, res) => {
     try {
@@ -42,10 +8,8 @@ const uploadProfilePicture = async (req, res) => {
         }
 
         // Base URL (dynamic based on environment)
-        const baseUrl = process.env.localhostUrl;
-
-        // Save full image URL instead of relative path
-        const imageUrl = `${baseUrl}/uploads/profile_picture/${req.file.filename}`;
+        // Cloudinary returns the full URL directly
+        const imageUrl = req.file.path;
 
         const userId = req.user?.userId;
         const existingProfile = await User.findById(userId);
